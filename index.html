@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>項鍊 AR 免費試戴 (MindAR)</title>
+  
+  <!-- 載入 A-Frame (3D 框架) -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- 載入 MindAR 臉部追蹤庫 -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-face-aframe.prod.js"></script>
+  
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    /* 載入中的提示樣式 */
+    #example-scanning-overlay {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      z-index: 99;
+      font-family: sans-serif;
+    }
+    #example-scanning-overlay.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 載入中遮罩層 -->
+  <div id="example-scanning-overlay">
+    <div>正在啟動 AR，請對準臉部...</div>
+  </div>
+
+  <!-- MindAR 臉部追蹤場景 -->
+  <a-scene 
+    mindar-face="autoStart: true; faceOccluder: false;" 
+    embedded 
+    color-space="sRGB" 
+    renderer="colorManagement: true, physicallyCorrectLights" 
+    vr-mode-ui="enabled: false" 
+    device-orientation-permission-ui="enabled: false">
+    
+    <a-assets>
+      <!-- 1. 在這裡載入你的項鍊 3D 模型 (.glb) -->
+      <a-asset-item id="necklaceModel" src="necklace.glb"></a-asset-item>
+    </a-assets>
+
+    <a-camera active="false" position="0 0 0"></a-camera>
+
+    <!-- 
+      2. 核心：模型繫結位置 (Face Anchor)
+      anchorIndex: 選用臉部特定的特徵點。
+      - 168: 鼻樑 (通常追蹤最穩)
+      - 152: 下巴正下方 (看起來更接近脖子位置，但低頭時模型會跟著動)
+      這裡我們選用較穩定的鼻樑，再透過 position 往下移。
+    -->
+    <a-entity mindar-face-target="anchorIndex: 168">
+      
+      <!-- 
+        3. 調整模型：
+        - src: 引用 ID [cite: 5]
+        - position: [X軸 Y軸 Z軸] -> Y軸設為負值（例如 -0.8）讓項鍊往下移到脖子位置[cite: 5]
+        - scale: 縮放大小，依照你的模型實際尺寸調整[cite: 5]
+        - rotation: 調整模型角度，確保面向鏡頭[cite: 5]
+      -->
+      <a-gltf-model 
+        src="#necklaceModel" 
+        position="0 -0.85 0" 
+        rotation="0 0 0" 
+        scale="0.01 0.01 0.01"
+        visible="false" 
+        class="necklace-entity">
+      </a-gltf-model>
+      
+    </a-entity>
+
+  </a-scene>
+
+  <script>
+    // 當 MindAR 偵測到臉部時，顯示項鍊，並隱藏載入提示
+    const sceneEl = document.querySelector('a-scene');
+    const overlayE1 = document.querySelector('#example-scanning-overlay');
+    const necklaceE1 = document.querySelector('.necklace-entity');
+
+    sceneEl.addEventListener('arReady', (event) => {
+      console.log("MindAR is ready");
+    });
+
+    // 臉部遺失時隠藏
+    sceneEl.addEventListener("targetLost", (event) => {
+      overlayE1.classList.remove('hidden');
+      necklaceE1.setAttribute("visible", "false");
+    });
+    
+    // 偵測到臉部時顯示
+    sceneEl.addEventListener("targetFound", (event) => {
+      overlayE1.classList.add('hidden');
+      necklaceE1.setAttribute("visible", "true");
+    });
+  </script>
+
+</body>
+</html>
