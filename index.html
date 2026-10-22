@@ -11,7 +11,7 @@
   
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: sans-serif; }
+    body { width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
     
     /* 載入中遮罩 */
     #loading {
@@ -21,19 +21,25 @@
     }
     #loading.hidden { opacity: 0; pointer-events: none; }
     
-    /* 底部微調操作面板 (解決不同身形、領口高低問題) */
+    /* 可移動的底部微調操作面板 */
     .control-panel {
       position: absolute;
-      bottom: 30px;
+      bottom: 5%; /* 往下調整至更貼近底部 */
       left: 50%;
       transform: translateX(-50%);
       z-index: 1000;
       display: flex;
       gap: 10px;
-      background: rgba(255, 255, 255, 0.15);
-      padding: 10px 18px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 12px 20px;
       border-radius: 40px;
       backdrop-filter: blur(10px);
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    .control-panel:active {
+      cursor: grabbing;
     }
     .control-btn {
       background: #ffffff;
@@ -56,8 +62,8 @@
     <p>正在啟動鏡頭與 AR 引擎...</p>
   </div>
 
-  <!-- 畫面上的微調按鈕：讓高矮胖瘦不同的使用者可以自己把項鍊喬到完美位置 -->
-  <div class="control-panel">
+  <!-- 可移動的微調按鈕面板 -->
+  <div class="control-panel" id="controlPanel">
     <button class="control-btn" onclick="adjustPos(0, 0.02, 0)">⬆️ 上</button>
     <button class="control-btn" onclick="adjustPos(0, -0.02, 0)">⬇️ 下</button>
     <button class="control-btn" onclick="adjustScale(0.05)">➕ 大</button>
@@ -98,6 +104,7 @@
     const sceneEl = document.querySelector('a-scene');
     const loading = document.querySelector('#loading');
     const model = document.querySelector('#necklace-entity');
+    const panel = document.querySelector('#controlPanel');
 
     // 啟動完成後隱藏載入畫面
     sceneEl.addEventListener('arReady', () => {
@@ -126,6 +133,59 @@
       const newScale = Math.max(0.1, scale.x + amount);
       model.setAttribute('scale', {x: newScale, y: newScale, z: newScale});
     }
+
+    // 實作面板的「可拖曳移動」功能（支援手機觸控與滑鼠）
+    let isDragging = false;
+    let startX, startY, startLeft, startTop;
+    let hasMoved = false;
+
+    panel.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      hasMoved = false;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      const rect = panel.getBoundingClientRect();
+      startLeft = rect.left;
+      startTop = rect.top;
+
+      // 切換為絕對像素定位，以便自由拖曳
+      panel.style.bottom = 'auto';
+      panel.style.transform = 'none';
+      panel.style.left = startLeft + 'px';
+      panel.style.top = startTop + 'px';
+
+      panel.setPointerCapture(e.pointerId);
+    });
+
+    panel.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        hasMoved = true;
+      }
+
+      panel.style.left = (startLeft + dx) + 'px';
+      panel.style.top = (startTop + dy) + 'px';
+    });
+
+    panel.addEventListener('pointerup', (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      try {
+        panel.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+    });
+
+    // 如果發生拖曳，則攔截點擊事件，避免拖曳時誤觸按鈕
+    panel.addEventListener('click', (e) => {
+      if (hasMoved) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+    }, true);
   </script>
 
 </body>
