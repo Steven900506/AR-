@@ -21,36 +21,58 @@
     }
     #loading.hidden { opacity: 0; pointer-events: none; }
     
-    /* 可移動的底部微調操作面板 */
+    /* 放大且可移動、可縮放的控制面板 */
     .control-panel {
       position: absolute;
-      bottom: 5%; /* 往下調整至更貼近底部 */
+      bottom: 25px; /* 移至畫面最底部，不擋臉 */
       left: 50%;
       transform: translateX(-50%);
       z-index: 1000;
       display: flex;
+      flex-direction: column;
       gap: 10px;
-      background: rgba(255, 255, 255, 0.2);
-      padding: 12px 20px;
-      border-radius: 40px;
-      backdrop-filter: blur(10px);
+      background: rgba(0, 0, 0, 0.65);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      padding: 16px;
+      border-radius: 20px;
+      backdrop-filter: blur(12px);
       cursor: grab;
       user-select: none;
       touch-action: none;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+      transform-origin: center center;
     }
     .control-panel:active {
       cursor: grabbing;
     }
+    
+    .panel-title {
+      color: #fff;
+      font-size: 14px;
+      text-align: center;
+      font-weight: bold;
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
     .control-btn {
       background: #ffffff;
       border: none;
-      padding: 8px 14px;
-      border-radius: 20px;
+      padding: 12px 18px;
+      border-radius: 12px;
       font-weight: bold;
-      font-size: 13px;
+      font-size: 15px;
       cursor: pointer;
       color: #333;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      flex: 1;
+      white-space: nowrap;
     }
     .control-btn:active { background: #007bff; color: white; }
   </style>
@@ -62,12 +84,21 @@
     <p>正在啟動鏡頭與 AR 引擎...</p>
   </div>
 
-  <!-- 可移動的微調按鈕面板 -->
+  <!-- 可移動與縮放的控制面板 -->
   <div class="control-panel" id="controlPanel">
-    <button class="control-btn" onclick="adjustPos(0, 0.02, 0)">⬆️ 上</button>
-    <button class="control-btn" onclick="adjustPos(0, -0.02, 0)">⬇️ 下</button>
-    <button class="control-btn" onclick="adjustScale(0.05)">➕ 大</button>
-    <button class="control-btn" onclick="adjustScale(-0.05)">➖ 小</button>
+    <div class="panel-title">👇 長按此面板可拖曳移動</div>
+    <div class="btn-row">
+      <button class="control-btn" onclick="adjustPos(0, 0.02, 0)">⬆️ 項鍊上</button>
+      <button class="control-btn" onclick="adjustPos(0, -0.02, 0)">⬇️ 項鍊下</button>
+    </div>
+    <div class="btn-row">
+      <button class="control-btn" onclick="adjustScale(0.05)">➕ 項鍊放大</button>
+      <button class="control-btn" onclick="adjustScale(-0.05)">➖ 項鍊縮小</button>
+    </div>
+    <div class="btn-row">
+      <button class="control-btn" style="background:#e0f7fa;" onclick="adjustPanelScale(0.15)">🔍 面板放大</button>
+      <button class="control-btn" style="background:#ffebee;" onclick="adjustPanelScale(-0.15)">🔍 面板縮小</button>
+    </div>
   </div>
 
   <!-- AR 場景 -->
@@ -121,17 +152,29 @@
       model.setAttribute('visible', 'false');
     });
 
-    // 微調上下位置
+    // 微調模型上下位置
     function adjustPos(x, y, z) {
       const pos = model.getAttribute('position');
       model.setAttribute('position', {x: pos.x + x, y: pos.y + y, z: pos.z + z});
     }
 
-    // 微調大小
+    // 微調模型大小
     function adjustScale(amount) {
       const scale = model.getAttribute('scale');
       const newScale = Math.max(0.1, scale.x + amount);
       model.setAttribute('scale', {x: newScale, y: newScale, z: newScale});
+    }
+
+    // 微調控制面板本身的縮放大小
+    let currentPanelScale = 1;
+    function adjustPanelScale(amount) {
+      currentPanelScale = Math.max(0.6, Math.min(1.8, currentPanelScale + amount));
+      updatePanelTransform();
+    }
+
+    function updatePanelTransform() {
+      // 保持置中或依目前位置縮放
+      panel.style.transform = `translate(-50%, -50%) scale(${currentPanelScale})`;
     }
 
     // 實作面板的「可拖曳移動」功能（支援手機觸控與滑鼠）
@@ -146,14 +189,13 @@
       startY = e.clientY;
 
       const rect = panel.getBoundingClientRect();
-      startLeft = rect.left;
-      startTop = rect.top;
+      startLeft = rect.left + rect.width / 2;
+      startTop = rect.top + rect.height / 2;
 
-      // 切換為絕對像素定位，以便自由拖曳
       panel.style.bottom = 'auto';
-      panel.style.transform = 'none';
       panel.style.left = startLeft + 'px';
       panel.style.top = startTop + 'px';
+      panel.style.transform = `translate(-50%, -50%) scale(${currentPanelScale})`;
 
       panel.setPointerCapture(e.pointerId);
     });
@@ -179,7 +221,6 @@
       } catch (err) {}
     });
 
-    // 如果發生拖曳，則攔截點擊事件，避免拖曳時誤觸按鈕
     panel.addEventListener('click', (e) => {
       if (hasMoved) {
         e.stopImmediatePropagation();
