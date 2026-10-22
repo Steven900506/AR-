@@ -2,72 +2,71 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>項鍊 AR 試戴 (MindAR)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>項鍊線上 AR 試戴</title>
   
-  <!-- 載入 A-Frame (3D 渲染引擎) -->
+  <!-- 載入 3D 引擎與臉部追蹤庫 -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <!-- 載入 MindAR 臉部追蹤庫 -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-face-aframe.prod.js"></script>
   
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: sans-serif; }
+    
+    /* 載入中遮罩 */
+    #loading {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.85); color: #fff;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 999; transition: opacity 0.4s ease;
     }
-    body {
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #000;
-    }
-    /* 載入中畫面 */
-    #loading-overlay {
+    #loading.hidden { opacity: 0; pointer-events: none; }
+    
+    /* 底部微調操作面板 (解決不同身形、領口高低問題) */
+    .control-panel {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.85);
-      color: #ffffff;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-      transition: opacity 0.5s ease;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.15);
+      padding: 10px 18px;
+      border-radius: 40px;
+      backdrop-filter: blur(10px);
     }
-    #loading-overlay.hidden {
-      opacity: 0;
-      pointer-events: none;
+    .control-btn {
+      background: #ffffff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 13px;
+      cursor: pointer;
+      color: #333;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid rgba(255, 255, 255, 0.2);
-      border-top-color: #007bff;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    .control-btn:active { background: #007bff; color: white; }
   </style>
 </head>
 <body>
 
-  <!-- 啟動載入遮罩 -->
-  <div id="loading-overlay">
-    <div class="spinner"></div>
-    <p>正在相機中啟動人臉 AR 追蹤...</p>
+  <!-- 載入提示 -->
+  <div id="loading">
+    <p>正在啟動鏡頭與 AR 引擎...</p>
   </div>
 
-  <!-- A-Frame AR 場景 -->
+  <!-- 畫面上的微調按鈕：讓高矮胖瘦不同的使用者可以自己把項鍊喬到完美位置 -->
+  <div class="control-panel">
+    <button class="control-btn" onclick="adjustPos(0, 0.02, 0)">⬆️ 上</button>
+    <button class="control-btn" onclick="adjustPos(0, -0.02, 0)">⬇️ 下</button>
+    <button class="control-btn" onclick="adjustScale(0.05)">➕ 大</button>
+    <button class="control-btn" onclick="adjustScale(-0.05)">➖ 小</button>
+  </div>
+
+  <!-- AR 場景 -->
   <a-scene 
-    mindar-face="autoStart: true; faceOccluder: false;" 
+    mindar-face="autoStart: true;" 
     embedded 
     color-space="sRGB" 
     renderer="colorManagement: true, physicallyCorrectLights: true" 
@@ -75,22 +74,15 @@
     device-orientation-permission-ui="enabled: false">
     
     <a-assets>
-      <!-- 請確保你的 GitHub/Vercel 目錄內有 necklace.glb 檔案 -->
       <a-asset-item id="necklaceModel" src="necklace.glb"></a-asset-item>
     </a-assets>
 
-    <!-- 攝影機與照亮 3D 項鍊的金屬環境光 -->
     <a-camera active="false" position="0 0 0"></a-camera>
-    <a-light type="ambient" intensity="1.5"></a-light>
-    <a-light type="directional" position="0 2 2" intensity="1.0"></a-light>
+    <a-light type="ambient" intensity="1.3"></a-light>
+    <a-light type="directional" position="0 2 2" intensity="0.9"></a-light>
 
-    <!-- 
-      臉部錨點對齊 (Anchor Point):
-      Index 152 是「下巴最下緣」，以這裡向下偏移是最接近脖子與胸口的位置。
-    -->
+    <!-- 追蹤下巴錨點 (Index 152) -->
     <a-entity mindar-face-target="anchorIndex: 152">
-      
-      <!-- 1. 項鍊 3D 模型 (.glb) -->
       <a-gltf-model 
         id="necklace-entity"
         src="#necklaceModel" 
@@ -99,50 +91,41 @@
         scale="0.5 0.5 0.5"
         visible="false">
       </a-gltf-model>
-
-      <!-- 2. 除錯備用球體：如果 .glb 模型尺寸太小或路徑錯誤，這個紅點會幫你指示脖子的目標位置 -->
-      <a-sphere 
-        id="debug-sphere" 
-        color="#ff0055" 
-        radius="0.03" 
-        position="0 -0.45 -0.1"
-        visible="false">
-      </a-sphere>
-
     </a-entity>
-
   </a-scene>
 
   <script>
     const sceneEl = document.querySelector('a-scene');
-    const overlayEl = document.querySelector('#loading-overlay');
-    const necklaceEntity = document.querySelector('#necklace-entity');
-    const debugSphere = document.querySelector('#debug-sphere');
+    const loading = document.querySelector('#loading');
+    const model = document.querySelector('#necklace-entity');
 
-    // AR 初始化完成
+    // 啟動完成後隱藏載入畫面
     sceneEl.addEventListener('arReady', () => {
-      console.log("MindAR 臉部追蹤已準備就緒");
+      loading.classList.add('hidden');
     });
 
-    // 模型載入失敗時觸發 (例如檔案不存在或 404)
-    necklaceEntity.addEventListener('model-error', (e) => {
-      console.error("無法載入 necklace.glb 檔案，已開啟紅點定位提示", e);
-      // 若 3D 模型載入失敗，顯示紅色測試球體
-      debugSphere.setAttribute("visible", "true");
-    });
-
-    // 成功偵測到臉部
+    // 抓到臉部時顯示模型
     sceneEl.addEventListener("targetFound", () => {
-      overlayEl.classList.add('hidden');
-      necklaceEntity.setAttribute("visible", "true");
+      model.setAttribute('visible', 'true');
     });
 
-    // 臉部離開畫面
+    // 臉部離開時隱藏模型
     sceneEl.addEventListener("targetLost", () => {
-      overlayEl.classList.remove('hidden');
-      necklaceEntity.setAttribute("visible", "false");
-      debugSphere.setAttribute("visible", "false");
+      model.setAttribute('visible', 'false');
     });
+
+    // 微調上下位置
+    function adjustPos(x, y, z) {
+      const pos = model.getAttribute('position');
+      model.setAttribute('position', {x: pos.x + x, y: pos.y + y, z: pos.z + z});
+    }
+
+    // 微調大小
+    function adjustScale(amount) {
+      const scale = model.getAttribute('scale');
+      const newScale = Math.max(0.1, scale.x + amount);
+      model.setAttribute('scale', {x: newScale, y: newScale, z: newScale});
+    }
   </script>
 
 </body>
